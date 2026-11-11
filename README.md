@@ -1,6 +1,6 @@
 # rick-morty-backend
 
-Учебный проект: свой бекенд по мотивам [Rick and Morty API](https://rickandmortyapi.com/). Репозиторий будем наращивать по шагам; в этом README со временем соберём самое важное по настройке, API и разработке.
+Учебный проект: свой бекенд по мотивам [Rick and Morty API](https://rickandmortyapi.com/).
 
 ## Стек
 
