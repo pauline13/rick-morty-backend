@@ -4,16 +4,27 @@ import { characters, type Character } from './data/characters';
 import {
   getPathname,
   parseCharacterId,
-  readJsonBody,
+  readCharacterInput,
+  readJsonBodyOrSendError,
   sendError,
   sendJson
 } from './lib/http';
-import { parseCharacterInput, parseCharacterPatch } from './lib/validate';
+import { parseCharacterPatch } from './lib/validate';
 import { StatusCodes } from 'http-status-codes';
 
 function findCharacterIndex(id: string): number {
-  return characters.findIndex((c) => c.id === id);
+  return characters.findIndex((character) => character.id === id);
 }
+
+export const METHODS_ON_ONE_CHARACTER = new Set([
+  'GET',
+  'PUT',
+  'PATCH',
+  'DELETE'
+]);
+
+const DEFAULT_PORT = 3000;
+const DEFAULT_HOST = 'localhost';
 
 async function handleRequest(
   req: http.IncomingMessage,
@@ -34,23 +45,15 @@ async function handleRequest(
     }
 
     if (method === 'POST') {
-      let body: unknown;
-      try {
-        body = await readJsonBody(req);
-      } catch {
-        sendError(res, StatusCodes.BAD_REQUEST, 'Invalid JSON');
-        return;
-      }
+      const characterFields = await readCharacterInput(req, res);
+      if (!characterFields) return;
 
-      const input = parseCharacterInput(body);
-      if (!input) {
-        sendError(res, StatusCodes.BAD_REQUEST, 'Invalid character data');
-        return;
-      }
-
-      const created: Character = { id: randomUUID(), ...input };
-      characters.push(created);
-      sendJson(res, StatusCodes.CREATED, created);
+      const createdCharacter = {
+        id: randomUUID(),
+        ...characterFields
+      } as Character;
+      characters.push(createdCharacter);
+      sendJson(res, StatusCodes.CREATED, createdCharacter);
       return;
     }
 
@@ -58,77 +61,49 @@ async function handleRequest(
     return;
   }
 
-  const id = parseCharacterId(pathname);
+  const characterId = parseCharacterId(pathname);
 
-  if (id) {
-    const index = findCharacterIndex(id);
+  if (characterId) {
+    const characterIndex = findCharacterIndex(characterId);
+    if (METHODS_ON_ONE_CHARACTER.has(method) && characterIndex === -1) {
+      sendError(res, StatusCodes.NOT_FOUND, 'Character not found');
+      return;
+    }
 
     if (method === 'GET') {
-      if (index === -1) {
-        sendError(res, StatusCodes.NOT_FOUND, 'Character not found');
-        return;
-      }
-      sendJson(res, StatusCodes.OK, characters[index]);
+      sendJson(res, StatusCodes.OK, characters[characterIndex]);
       return;
     }
 
     if (method === 'PUT') {
-      if (index === -1) {
-        sendError(res, StatusCodes.NOT_FOUND, 'Character not found');
-        return;
-      }
+      const characterFields = await readCharacterInput(req, res);
+      if (!characterFields) return;
 
-      let body: unknown;
-      try {
-        body = await readJsonBody(req);
-      } catch {
-        sendError(res, StatusCodes.BAD_REQUEST, 'Invalid JSON');
-        return;
-      }
-
-      const input = parseCharacterInput(body);
-      if (!input) {
-        sendError(res, StatusCodes.BAD_REQUEST, 'Invalid character data');
-        return;
-      }
-
-      characters[index] = { id, ...input };
-      sendJson(res, StatusCodes.OK, characters[index]);
+      characters[characterIndex] = { id: characterId, ...characterFields };
+      sendJson(res, StatusCodes.OK, characters[characterIndex]);
       return;
     }
 
     if (method === 'PATCH') {
-      if (index === -1) {
-        sendError(res, StatusCodes.NOT_FOUND, 'Character not found');
-        return;
-      }
+      const body = await readJsonBodyOrSendError(req, res);
+      if (body === undefined) return;
 
-      let body: unknown;
-      try {
-        body = await readJsonBody(req);
-      } catch {
-        sendError(res, StatusCodes.BAD_REQUEST, 'Invalid JSON');
-        return;
-      }
-
-      const patch = parseCharacterPatch(body);
-      if (!patch) {
+      const patchFields = parseCharacterPatch(body);
+      if (!patchFields) {
         sendError(res, StatusCodes.BAD_REQUEST, 'Invalid patch data');
         return;
       }
 
-      characters[index] = { ...characters[index], ...patch };
-      sendJson(res, StatusCodes.OK, characters[index]);
+      characters[characterIndex] = {
+        ...characters[characterIndex],
+        ...patchFields
+      };
+      sendJson(res, StatusCodes.OK, characters[characterIndex]);
       return;
     }
 
     if (method === 'DELETE') {
-      if (index === -1) {
-        sendError(res, StatusCodes.NOT_FOUND, 'Character not found');
-        return;
-      }
-
-      characters.splice(index, 1);
+      characters.splice(characterIndex, 1);
       sendJson(res, StatusCodes.NO_CONTENT);
       return;
     }
@@ -143,6 +118,7 @@ async function handleRequest(
 const server = http.createServer((req, res) => {
   handleRequest(req, res).catch((err) => {
     console.error(err);
+
     if (!res.headersSent) {
       sendError(
         res,
@@ -153,9 +129,10 @@ const server = http.createServer((req, res) => {
   });
 });
 
-const port = Number(process.env.PORT ?? 3000);
+const port = Number(process.env.PORT ?? DEFAULT_PORT);
+
 server.listen(port, () => {
-  console.log(`Listening on http://localhost:${port}`);
+  console.log(`Listening on http://${DEFAULT_HOST}:${port}`);
 });
 
 server.on('error', (err) => {

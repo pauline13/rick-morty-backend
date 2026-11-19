@@ -1,9 +1,11 @@
 import type http from 'node:http';
 import { StatusCodes } from 'http-status-codes';
+import type { CharacterInput } from '../data/characters';
+import { parseCharacterInput } from './validate';
 
 const JSON_TYPE = 'application/json';
 
-export function getPathname(url: string | undefined): string {
+export function getPathname(url?: string): string {
   return (url ?? '').split('?')[0];
 }
 
@@ -11,6 +13,35 @@ export function getPathname(url: string | undefined): string {
 export function parseCharacterId(pathname: string): string | null {
   const match = pathname.match(/^\/characters\/([^/]+)$/);
   return match?.[1] ?? null;
+}
+
+export async function readJsonBodyOrSendError(
+  req: http.IncomingMessage,
+  res: http.ServerResponse
+): Promise<unknown | undefined> {
+  try {
+    return await readJsonBody(req);
+  } catch {
+    sendError(res, StatusCodes.BAD_REQUEST, 'Invalid JSON');
+    return undefined;
+  }
+}
+
+export async function readCharacterInput(
+  req: http.IncomingMessage,
+  res: http.ServerResponse
+): Promise<CharacterInput | undefined> {
+  const body = await readJsonBodyOrSendError(req, res);
+
+  if (body === undefined) return undefined;
+
+  const characterFields = parseCharacterInput(body);
+
+  if (!characterFields) {
+    sendError(res, StatusCodes.BAD_REQUEST, 'Invalid character data');
+    return undefined;
+  }
+  return characterFields;
 }
 
 export function readJsonBody(req: http.IncomingMessage): Promise<unknown> {
