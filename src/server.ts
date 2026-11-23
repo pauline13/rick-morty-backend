@@ -46,12 +46,14 @@ async function handleRequest(
 
     if (method === 'POST') {
       const characterFields = await readCharacterInput(req, res);
+
       if (!characterFields) return;
 
-      const createdCharacter = {
+      const createdCharacter: Character = {
         id: randomUUID(),
         ...characterFields
-      } as Character;
+      };
+
       characters.push(createdCharacter);
       sendJson(res, StatusCodes.CREATED, createdCharacter);
       return;
@@ -65,6 +67,7 @@ async function handleRequest(
 
   if (characterId) {
     const characterIndex = findCharacterIndex(characterId);
+
     if (METHODS_ON_ONE_CHARACTER.has(method) && characterIndex === -1) {
       sendError(res, StatusCodes.NOT_FOUND, 'Character not found');
       return;
@@ -77,18 +80,22 @@ async function handleRequest(
 
     if (method === 'PUT') {
       const characterFields = await readCharacterInput(req, res);
+
       if (!characterFields) return;
 
       characters[characterIndex] = { id: characterId, ...characterFields };
+
       sendJson(res, StatusCodes.OK, characters[characterIndex]);
       return;
     }
 
     if (method === 'PATCH') {
       const body = await readJsonBodyOrSendError(req, res);
+
       if (body === undefined) return;
 
       const patchFields = parseCharacterPatch(body);
+
       if (!patchFields) {
         sendError(res, StatusCodes.BAD_REQUEST, 'Invalid patch data');
         return;
@@ -98,6 +105,7 @@ async function handleRequest(
         ...characters[characterIndex],
         ...patchFields
       };
+
       sendJson(res, StatusCodes.OK, characters[characterIndex]);
       return;
     }
