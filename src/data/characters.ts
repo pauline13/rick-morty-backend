@@ -1,3 +1,7 @@
+export interface CharacterParams {
+  id: string;
+}
+
 export type CharacterStatus = 'alive' | 'dead' | 'unknown';
 export type CharacterGender = 'male' | 'female' | 'genderless' | 'unknown';
 
@@ -28,7 +32,7 @@ export const characters: Character[] = [
   {
     id: '550e8400-e29b-41d4-a716-446655440002',
     name: 'Morty Smith',
-    status: 'alive',
+    status: 'dead',
     species: 'Human',
     location: 'Earth (C-137)',
     gender: 'male',
